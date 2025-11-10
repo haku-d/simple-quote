@@ -1,0 +1,125 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id           String      @id @default(cuid())
+  email        String      @unique
+  password     String
+  name         String
+  role         Role
+  needApproval Boolean     @default(true)
+  quotations   Quotation[]
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @updatedAt
+}
+
+enum Role {
+  ADMIN
+  MANAGER
+  SALE
+}
+
+model Product {
+  id             String          @id @default(cuid())
+  code           String          @unique
+  sku            String
+  name           String
+  width          Float?
+  height         Float?
+  widthUnit      String?
+  heightUnit     String?
+  status         Boolean         @default(true)
+  options        Option[]
+  quotationItems QuotationItem[]
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+}
+
+model Option {
+  id         String         @id @default(cuid())
+  productId  String
+  code       String
+  sku        String
+  name       String
+  type       OptionType
+  level      Int
+  order      Int
+  groupName  String?
+  selection  SelectionType?
+  required   Boolean
+  sameParent Boolean
+  hidden     Boolean
+  qty        Int
+  cost       Float?
+  pricebreak Json? // [{minQty: number, costPerUnit: number}]
+  parentId   String?
+  product    Product        @relation(fields: [productId], references: [id], onDelete: Cascade)
+  parent     Option?        @relation("OptionTree", fields: [parentId], references: [id], onDelete: Cascade)
+  children   Option[]       @relation("OptionTree")
+
+  @@unique([productId, code])
+}
+
+enum OptionType {
+  Option
+  Selector
+  Factor
+}
+
+enum SelectionType {
+  Exclusive
+  Inclusive
+}
+
+model Quotation {
+  id              String          @id @default(cuid())
+  number          String          @unique
+  customerName    String
+  customerCompany String?
+  status          QuotationStatus @default(DRAFT)
+  discount        Float?
+  discountType    DiscountType?
+  taxRate         Float           @default(10)
+  currency        String          @default("USD")
+  expiryDate      DateTime
+  note            String?
+  policy          String?
+  userId          String
+  items           QuotationItem[]
+  user            User            @relation(fields: [userId], references: [id])
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+}
+
+model QuotationItem {
+  id              String    @id @default(cuid())
+  quotationId     String
+  productId       String
+  orderQty        Int
+  selectedOptions Json // [{optionId: string, factorId?: string}]
+  lineTotal       Float
+  quotation       Quotation @relation(fields: [quotationId], references: [id], onDelete: Cascade)
+  product         Product   @relation(fields: [productId], references: [id])
+}
+
+enum QuotationStatus {
+  DRAFT
+  PENDING
+  APPROVED
+  REJECTED
+  SENT
+}
+
+enum DiscountType {
+  percent
+  fixed
+}
